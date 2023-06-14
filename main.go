@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gofiber/fiber/v2"					// used for routing
-	"github.com/joho/godotenv"                      // used to load environment variables
+	"github.com/gofiber/fiber/v2" // used for routing
+	"github.com/joho/godotenv"    // used to load environment variables
 	"github.com/rishi058/go-project/models"
 	"github.com/rishi058/go-project/storage"
-	"gorm.io/gorm"   								// used for connecting postgres 
+	"gorm.io/gorm" // used for connecting postgres
 )
 
 type Book struct {
@@ -151,4 +151,5 @@ func main() {
 	app := fiber.New()
 	r.SetupRoutes(app)
 	app.Listen(":8080")
+
 }
