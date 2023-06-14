@@ -150,6 +150,13 @@ func main() {
 	}
 	app := fiber.New()
 	r.SetupRoutes(app)
-	app.Listen("0.0.0.0:3000") //
+
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "3000"
+	}
+
+	app.Listen("0.0.0.0:" + port)
 
 }
