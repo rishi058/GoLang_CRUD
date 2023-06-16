@@ -1,4 +1,4 @@
-package main
+package main // name of this file -> i.e use this name to import functions/data of this file
 
 import (
 	"fmt"
@@ -6,27 +6,27 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gofiber/fiber/v2" // used for routing
-	"github.com/joho/godotenv"    // used to load environment variables
-	"github.com/rishi058/go-project/models"
-	"github.com/rishi058/go-project/storage"
-	"gorm.io/gorm" // used for connecting postgres
+	"github.com/gofiber/fiber/v2"            // used for routing (it's a web framework)
+	"github.com/joho/godotenv"               // used to load environment variables
+	"github.com/rishi058/go-project/models"  // importing local files
+	"github.com/rishi058/go-project/storage" // importing local files
+	"gorm.io/gorm"                           // used for connecting postgres
 )
 
-type Book struct {
+type Book struct {                   // this data_model is recieved from client side. [for inserting book]
 	Author    string `json:"author"`
 	Title     string `json:"title"`
 	Publisher string `json:"publisher"`
 }
 
-type Repository struct {
-	DB *gorm.DB
+type DB_instance struct {    // suppose it is a class [of database]
+	data *gorm.DB
 }
 
-func (r *Repository) CreateBook(context *fiber.Ctx) error {
+func (db *DB_instance) CreateBook(context *fiber.Ctx) ( error ) {   // suppose this a function of the class.
 	book := Book{}
 
-	err := context.BodyParser(&book)
+	err := context.BodyParser(&book)  // context is json recieved from client is parsed int book-struct
 
 	if err != nil {
 		context.Status(http.StatusUnprocessableEntity).JSON(
@@ -34,7 +34,8 @@ func (r *Repository) CreateBook(context *fiber.Ctx) error {
 		return err
 	}
 
-	err = r.DB.Create(&book).Error
+	err = db.data.Create(&book).Error  // !inserting in database (postgres)
+
 	if err != nil {
 		context.Status(http.StatusBadRequest).JSON(
 			&fiber.Map{"message": "could not create book"})
@@ -46,9 +47,10 @@ func (r *Repository) CreateBook(context *fiber.Ctx) error {
 	return nil
 }
 
-func (r *Repository) DeleteBook(context *fiber.Ctx) error {
-	bookModel := models.Books{}
+func (db *DB_instance) DeleteBook(context *fiber.Ctx) error {
+	bookModel := models.BooksTable{}
 	id := context.Params("id")
+
 	if id == "" {
 		context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
 			"message": "id cannot be empty",
@@ -56,7 +58,7 @@ func (r *Repository) DeleteBook(context *fiber.Ctx) error {
 		return nil
 	}
 
-	err := r.DB.Delete(bookModel, id)
+	err := db.data.Delete(bookModel, id)   //! deleting a book from the table.
 
 	if err.Error != nil {
 		context.Status(http.StatusBadRequest).JSON(&fiber.Map{
@@ -70,10 +72,11 @@ func (r *Repository) DeleteBook(context *fiber.Ctx) error {
 	return nil
 }
 
-func (r *Repository) GetBooks(context *fiber.Ctx) error {
-	bookModels := &[]models.Books{}
+func (db *DB_instance) GetBooks(context *fiber.Ctx) error {
+	bookModels := &[]models.BooksTable{}  		// slice of books
 
-	err := r.DB.Find(bookModels).Error
+	err := db.data.Find(bookModels).Error      //! getting all books 
+
 	if err != nil {
 		context.Status(http.StatusBadRequest).JSON(
 			&fiber.Map{"message": "could not get books"})
@@ -87,10 +90,11 @@ func (r *Repository) GetBooks(context *fiber.Ctx) error {
 	return nil
 }
 
-func (r *Repository) GetBookByID(context *fiber.Ctx) error {
+func (db *DB_instance) GetBookByID(context *fiber.Ctx) error {
 
 	id := context.Params("id")
-	bookModel := &models.Books{}
+	bookModel := &models.BooksTable{}
+
 	if id == "" {
 		context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
 			"message": "id cannot be empty",
@@ -100,7 +104,8 @@ func (r *Repository) GetBookByID(context *fiber.Ctx) error {
 
 	fmt.Println("the ID is", id)
 
-	err := r.DB.Where("id = ?", id).First(bookModel).Error
+	err := db.data.Where("id = ?", id).First(bookModel).Error   //! getting book by id.
+
 	if err != nil {
 		context.Status(http.StatusBadRequest).JSON(
 			&fiber.Map{"message": "could not get the book"})
@@ -113,19 +118,22 @@ func (r *Repository) GetBookByID(context *fiber.Ctx) error {
 	return nil
 }
 
-func (r *Repository) SetupRoutes(app *fiber.App) {
+func (db DB_instance) SetupRoutes(app *fiber.App) {
 	api := app.Group("/api")
-	api.Post("/create_books", r.CreateBook)
-	api.Delete("delete_book/:id", r.DeleteBook)
-	api.Get("/get_books/:id", r.GetBookByID)
-	api.Get("/books", r.GetBooks)
+	api.Post("/create_books", db.CreateBook)
+	api.Delete("delete_book/:id", db.DeleteBook)
+	api.Get("/get_books/:id", db.GetBookByID)
+	api.Get("/books", db.GetBooks)
 }
 
 func main() {
+
 	err := godotenv.Load(".env")
+
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	config := &storage.Config{
 		Host:     os.Getenv("DB_HOST"),
 		Port:     os.Getenv("DB_PORT"),
@@ -135,21 +143,24 @@ func main() {
 		DBName:   os.Getenv("DB_NAME"),
 	}
 
-	db, err := storage.NewConnection(config)
+	db, err := storage.NewConnection(config)  // establishing connection with the postgres DB server.
 
 	if err != nil {
 		log.Fatal("could not load the database")
 	}
-	err = models.MigrateBooks(db)
+
+	err = models.MigrateData(db)   // creating tables if not exist.
+
 	if err != nil {
 		log.Fatal("could not migrate db")
 	}
 
-	r := Repository{
-		DB: db,
+	allData := DB_instance{
+		data: db,
 	}
+
 	app := fiber.New()
-	r.SetupRoutes(app)
+	allData.SetupRoutes(app)
 
 	port := os.Getenv("PORT")
 
